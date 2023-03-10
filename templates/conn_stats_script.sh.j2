@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+LOG_ENTRY_PREFIX="openvpn_connection_custom_tracking:"
+MESSAGE="script_type='${script_type}' untrusted_ip='${untrusted_ip}' untrusted_port='${untrusted_port}' trusted_ip='${trusted_ip}' trusted_port='${trusted_port}' ifconfig_pool_remote_ip='${ifconfig_pool_remote_ip}' IV_PLAT='${IV_PLAT}' IV_GUI_VER='${IV_GUI_VER}'"
+# if radius is used, add username field
+if [ -n "$username" ]
+then
+  MESSAGE="${MESSAGE} username='${username}'"
+fi
+# if disconnect, add summary fields
+if [[ "$script_type" == "client-disconnect" ]]
+then
+  MESSAGE="${MESSAGE} time_duration='${time_duration}' bytes_received='${bytes_received}' bytes_sent='${bytes_sent}'"
+fi
+{% if ovpnxor_ovpn_log_path is defined %}
+echo "$(date --rfc-3339=seconds | rev | cut -c7- | rev) ${LOG_ENTRY_PREFIX} ${MESSAGE}" >> {{ ovpnxor_ovpn_log_path }}
+{% else %}
+/usr/bin/logger "${LOG_ENTRY_PREFIX} ${MESSAGE}"
+{% endif %}

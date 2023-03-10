@@ -1,0 +1,14 @@
+---
+# handlers file for ovpnxor_radius
+
+- name: Reload sysctl values
+  ansible.builtin.command:
+    argv:
+      - sysctl
+      - --system
+
+- name: Restart openvpn service
+  ansible.builtin.systemd:
+    name: openvpn
+    daemon_reload: true
+    state: restarted

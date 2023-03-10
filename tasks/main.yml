@@ -1,0 +1,122 @@
+---
+# tasks file for ovpnxor_radius
+
+- name: Make sure we have deb-src repo available
+  ansible.builtin.apt_repository:
+    repo: deb-src http://archive.ubuntu.com/ubuntu/ focal main restricted universe multiverse
+    state: present
+
+- name: Check if openvpn binary file already exists
+  ansible.builtin.stat:
+    path: /usr/local/sbin/openvpn
+  register: reg_openvpn_binary_file
+
+- name: Build openvpn_xor if required
+  import_tasks: build_ovpnxor.yml
+  when: not reg_openvpn_binary_file.stat.exists or ovpnxor_force_rebuild
+
+- name: Make sure directory for ovpn bins exists
+  ansible.builtin.file:
+    path: "{{ ovpnxor_ovpn_bins_dir }}"
+    state: directory
+
+- name: Download and extract ovpn bins archive
+  ansible.builtin.unarchive:
+    src: "{{ ovpnxor_ovpn_bins_url }}"
+    remote_src: yes
+    dest: "{{ ovpnxor_ovpn_bins_dir }}"
+    mode: '0755'
+    owner: root
+    group: root
+    keep_newer: yes
+  notify: Restart openvpn service
+
+- name: Create required OpenVPN directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ ovpnxor_ovpn_dir }}"
+    - "{{ ovpnxor_easyrsa_pki_dir }}"
+    - "{{ ovpnxor_easyrsa_vars_file }}"
+    - "{{ ovpnxor_ovpn_dir }}/ccd"
+
+- name: Copy SSL
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: crl.pem, dest: "{{ ovpnxor_ovpn_dir }}/crl.pem", owner: root, group: root, mode: 0644 }
+    - { src: server.key, dest: "{{ ovpnxor_easyrsa_pki_dir }}/server.key", owner: root, group: root, mode: 0600 }
+    - { src: server.crt, dest: "{{ ovpnxor_easyrsa_pki_dir }}/server.crt", owner: root, group: root, mode: 0644 }
+    - { src: ca.crt, dest: "{{ ovpnxor_easyrsa_pki_dir }}/ca.crt", owner: root, group: root, mode: 0644 }
+    - { src: dh.pem, dest: "{{ ovpnxor_easyrsa_pki_dir }}/dh.pem", owner: root, group: root, mode: 0644 }
+    - { src: ta.key, dest: "{{ ovpnxor_easyrsa_pki_dir }}/ta.key", owner: root, group: root, mode: 0600 }
+  notify: Restart openvpn service
+
+- name: Generete configurations
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: ovpn_env.sh.j2, dest: "{{ ovpnxor_ovpn_dir }}/ovpn_env.sh", owner: root, group: root, mode: 0755 }
+    - { src: openvpn.conf.j2, dest: "{{ ovpnxor_ovpn_dir }}/openvpn.conf", owner: root, group: root, mode: 0600 }
+    - { src: pam.d_openvpn.j2, dest: "/etc/pam.d/openvpn", owner: root, group: root, mode: 0644 }
+    - { src: pam_radius_auth.conf.j2, dest: "/etc/pam_radius_auth.conf", owner: root, group: root, mode: 0600 }
+  notify: Restart openvpn service
+
+- name: Copy systemd service file
+  ansible.builtin.copy:
+    src: "{{ role_path }}/files/systemd_openvpn.service"
+    dest:  "/etc/systemd/system/openvpn.service"
+    mode: '0600'
+    owner: root
+    group: root
+  notify: Restart openvpn service
+
+- name: Copy sysctl configuration file
+  ansible.builtin.copy:
+    src: "{{ role_path }}/files/sysctl.conf"
+    dest:  "/etc/sysctl.d/ovpnxor.conf"
+    mode: '0600'
+    owner: root
+    group: root
+  notify: Reload sysctl values
+
+- name: Copy logrotate openvpn configuration file
+  ansible.builtin.template:
+    src: logrotate_openvpn.j2
+    dest:  "/etc/logrotate.d/openvpn"
+    mode: '0600'
+    owner: root
+    group: root
+  when: ovpnxor_ovpn_log_path is defined
+
+- name: Generate script to log connection stats
+  ansible.builtin.template:
+    src: conn_stats_script.sh.j2
+    dest:  "{{ ovpnxor_ovpn_dir }}/{{ ovpnxor_conn_stats_scriptname }}"
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Copy tc script limit
+  template:
+    src: tc_ip_all.sh.j2
+    dest: /opt/tc_ip_all.sh
+    owner: root
+    mode: '0755'
+  when: BANDWIDTH_LIMIT is defined
+  notify: Restart openvpn service
+
+- name: Enable and start openvpn service
+  ansible.builtin.systemd:
+    name: openvpn.service
+    enabled: yes
+    state: started

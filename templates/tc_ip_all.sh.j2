@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+SUBNET_NET={{ ovpnxor_ovpn_server_net.split('.')[0:3] | join('.') }}
+SERVER_PUB_NIC="$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)"
+OVPN_NIC="tun0"
+IPTABLES_RULE_ID="tc_auto_generated"
+
+if [[ -e /opt/tc_ip_all.env ]] ; then
+  source /opt/tc_ip_all.env
+fi
+if [[ -z $BANDWIDTH ]] ; then
+  BANDWIDTH="{{ BANDWIDTH_LIMIT|default("") }}" # "" implies tc is disabled, any other value - enabled
+fi
+
+remove_tc_rules() {
+  tc qdisc del dev ${SERVER_PUB_NIC} root
+}
+
+set_tc_rules() {
+  remove_tc_rules
+
+  tc qdisc add dev ${SERVER_PUB_NIC} root handle 1: htb default 0
+  tc class add dev ${SERVER_PUB_NIC} parent 1: classid 1:0 pfifo_fast
+
+  for i in {2..254}
+  do
+    tc class add dev ${SERVER_PUB_NIC} parent 1: classid 1:1${i} htb rate ${BANDWIDTH} ceil ${BANDWIDTH}
+    tc qdisc add dev ${SERVER_PUB_NIC} parent 1:1${i} sfq perturb 10
+    tc filter add dev ${SERVER_PUB_NIC} protocol ip parent 1: prio 1 handle 1${i} fw flowid 1:1${i} classid 1:1${i}
+  done
+}
+
+remove_iptables_rules() {
+  iptables-save | grep "$IPTABLES_RULE_ID" | while read -r ipt_rule
+  do
+    eval iptables "$(echo -n "$ipt_rule" | perl -pe 's/^-[AI]/-D/')"
+  done
+}
+
+set_iptables_rules() {
+  for i in {2..254}
+  do
+    iptables -I FORWARD -s ${SUBNET_NET}.${i} -j MARK --set-mark 1${i} -m comment --comment "$IPTABLES_RULE_ID"
+    iptables -I FORWARD -d ${SUBNET_NET}.${i} -j MARK --set-mark 1${i} -m comment --comment "$IPTABLES_RULE_ID"
+  done
+}
+
+# -------------------------------------------
+
+remove_iptables_rules
+remove_tc_rules
+
+if [ "$BANDWIDTH" != "" ]
+then
+  set_tc_rules
+  set_iptables_rules
+fi

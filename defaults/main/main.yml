@@ -1,0 +1,22 @@
+---
+
+ovpnxor_src_dir: /usr/local/src
+ovpnxor_ovpn_version: 2.5.1
+ovpnxor_tunnelblick_version: 3.8.5beta05
+ovpnxor_ovpn_server_src_url: http://swupdate.openvpn.org/community/releases/openvpn-{{ ovpnxor_ovpn_version }}.tar.gz
+ovpnxor_tunnelblick_src_url: https://github.com/Tunnelblick/Tunnelblick/archive/v{{ ovpnxor_tunnelblick_version }}.zip
+ovpnxor_ovpn_bins_dir: /usr/local/bin
+ovpnxor_ovpn_bins_url: https://storage.cdin.me/pub/xor/ovpn-xor-bin.tar.xz
+
+ovpnxor_ovpn_dir: /etc/openvpn
+ovpnxor_easyrsa_dir: /usr/share/easy-rsa
+ovpnxor_easyrsa_pki_dir: "{{ ovpnxor_ovpn_dir }}/pki"
+ovpnxor_easyrsa_vars_file: "{{ ovpnxor_ovpn_dir }}/vars"
+
+ovpnxor_ovpn_protocol: udp
+
+ovpnxor_force_rebuild: no
+ovpnxor_use_radius: yes
+
+ovpnxor_scramble_obfuscate: oS3vN2CDg6QMmXCSoI0FeEBFub1NrRoA
+ovpnxor_scramble_xormask: KhhqBv2KL4s0XuwD1ucYdmHTUdWolCHO

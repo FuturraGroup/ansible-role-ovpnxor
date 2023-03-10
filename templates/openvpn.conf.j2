@@ -1,0 +1,58 @@
+# {{ ansible_managed }}
+
+server {{ ovpnxor_ovpn_server_net }} {{ ovpnxor_ovpn_server_net_mask }}
+verb 3
+key {{ ovpnxor_easyrsa_pki_dir }}/server.key
+ca {{ ovpnxor_easyrsa_pki_dir }}/ca.crt
+cert {{ ovpnxor_easyrsa_pki_dir }}/server.crt
+dh {{ ovpnxor_easyrsa_pki_dir }}/dh.pem
+tls-server
+tls-version-min 1.2
+tls-crypt {{ ovpnxor_easyrsa_pki_dir }}/ta.key
+auth SHA512
+cipher AES-256-GCM
+keepalive 10 60
+persist-key
+persist-tun
+duplicate-cn
+tun-mtu 1472
+mssfix 1300
+
+proto {{ ovpnxor_ovpn_protocol }}
+port {{ ovpnxor_ovpn_listen_port }}
+dev tun0
+status {{ ovpnxor_ovpn_status_file }}
+
+{% if ovpnxor_ovpn_log_path is defined %}
+log-append {{ ovpnxor_ovpn_log_path }}
+{% else %}
+syslog
+{% endif %}
+verb 3
+script-security 2
+client-connect "{{ ovpnxor_ovpn_dir }}/{{ ovpnxor_conn_stats_scriptname }}"
+client-disconnect "{{ ovpnxor_ovpn_dir }}/{{ ovpnxor_conn_stats_scriptname }}"
+
+user nobody
+group nogroup
+comp-lzo no
+
+{% if ovpnxor_use_radius %}
+verify-client-cert none
+username-as-common-name
+plugin /usr/local/lib/openvpn/plugins/openvpn-plugin-auth-pam.so openvpn
+
+{% endif %}
+scramble obfuscate {{ ovpnxor_scramble_obfuscate}}
+scramble xormask {{ ovpnxor_scramble_xormask }}
+scramble reverse
+
+### Route Configurations Below
+route {{ ovpnxor_ovpn_server_net_route }} {{ ovpnxor_ovpn_server_net_mask }}
+
+### Push Configurations Below
+push "block-outside-dns"
+push "dhcp-option DNS {{ ovpnxor_ovpn_dns_1 }}"
+push "dhcp-option DNS {{ ovpnxor_ovpn_dns_2 }}"
+push "comp-lzo no"
+push "explicit-exit-notify"

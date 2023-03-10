@@ -1,0 +1,10 @@
+{{ ovpnxor_ovpn_log_path }} {
+    weekly
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    create 0666 root adm
+}

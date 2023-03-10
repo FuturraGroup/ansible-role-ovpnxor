@@ -1,0 +1,9 @@
+---
+
+ovpnxor_radius_server_pwd: you-password
+ovpnxor_radius_server_ip1: 10.10.0.1
+ovpnxor_radius_server_timeout1: 10
+ovpnxor_radius_server_ip2: 10.10.0.2
+ovpnxor_radius_server_timeout2: 30
+
+ovpnxor_conn_stats_scriptname: "conn-stats-logger.sh"

@@ -1,0 +1,98 @@
+---
+
+- name: Update apt cache if required
+  ansible.builtin.apt:
+    cache_valid_time: 43200
+    update_cache: yes
+
+- name: Install build-dep for openvpn package
+  ansible.builtin.apt:
+    name: [openvpn]
+    state: build-dep
+
+- name: Install additional packages required for build
+  ansible.builtin.apt:
+    name: [unzip, libpam-radius-auth, libradcli4, qrencode, easy-rsa]
+    state: present
+
+- name: Make sure directory for extracted sources exists
+  ansible.builtin.file:
+    path: "{{ ovpnxor_src_dir }}"
+    state: directory
+
+- name: Download and extract openvpn-server source archive
+  ansible.builtin.unarchive:
+    src: "{{ ovpnxor_ovpn_server_src_url }}"
+    dest: "{{ ovpnxor_src_dir }}"
+    remote_src: yes
+    keep_newer: yes
+  register: openvpn_sources
+
+- name: Download and extract tunnelblick source archive
+  ansible.builtin.unarchive:
+    src: "{{ ovpnxor_tunnelblick_src_url }}"
+    remote_src: yes
+    dest: "{{ ovpnxor_src_dir }}"
+    mode: '0755'
+    owner: root
+    group: root
+    keep_newer: yes
+  register: tunnelblick_sources
+
+- name: Make sure directory for patched sources exists
+  ansible.builtin.file:
+    path: "{{ ovpnxor_src_dir }}/openvpn-patched-xor"
+    state: directory
+
+- name: Copy extracted openvpn-server sources
+  ansible.builtin.copy:
+    remote_src: yes
+    src: "{{ ovpnxor_src_dir }}/openvpn-{{ ovpnxor_ovpn_version }}"
+    dest: "{{ ovpnxor_src_dir }}/openvpn-patched-xor"
+    force: yes
+    mode: '0755'
+    owner: root
+    group: root
+  when: openvpn_sources.changed or tunnelblick_sources.changed or ovpnxor_force_rebuild
+
+- name: Patch openvpn server sources
+  ansible.posix.patch:
+    src: "{{ ovpnxor_src_dir }}/Tunnelblick-{{ ovpnxor_tunnelblick_version }}/third_party/sources/openvpn/openvpn-{{ ovpnxor_ovpn_version }}/patches/{{ item }}"
+    basedir: "{{ ovpnxor_src_dir }}/openvpn-patched-xor/openvpn-{{ ovpnxor_ovpn_version }}"
+    strip: 1
+    remote_src: yes
+  loop:
+    - 02-tunnelblick-openvpn_xorpatch-a.diff
+    - 03-tunnelblick-openvpn_xorpatch-b.diff
+    - 04-tunnelblick-openvpn_xorpatch-c.diff
+    - 05-tunnelblick-openvpn_xorpatch-d.diff
+    - 06-tunnelblick-openvpn_xorpatch-e.diff
+  when: openvpn_sources.changed or tunnelblick_sources.changed or ovpnxor_force_rebuild
+
+- name: Configure openvpn server sources
+  ansible.builtin.command:
+    argv:
+      - ./configure
+      - --disable-systemd
+      - --enable-async-push
+      - --enable-iproute2
+    chdir: "{{ ovpnxor_src_dir }}/openvpn-patched-xor/openvpn-{{ ovpnxor_ovpn_version }}"
+  when: openvpn_sources.changed or tunnelblick_sources.changed or ovpnxor_force_rebuild
+
+- name: Perform make clean for openvpn server sources
+  ansible.builtin.make:
+    chdir: "{{ ovpnxor_src_dir }}/openvpn-patched-xor/openvpn-{{ ovpnxor_ovpn_version }}"
+    target: clean
+  when: openvpn_sources.changed or tunnelblick_sources.changed or ovpnxor_force_rebuild
+
+- name: Perform make for openvpn server sources
+  ansible.builtin.make:
+    chdir: "{{ ovpnxor_src_dir }}/openvpn-patched-xor/openvpn-{{ ovpnxor_ovpn_version }}"
+  when: openvpn_sources.changed or tunnelblick_sources.changed or ovpnxor_force_rebuild
+
+- name: Perform make install for openvpn server sources
+  ansible.builtin.make:
+    chdir: "{{ ovpnxor_src_dir }}/openvpn-patched-xor/openvpn-{{ ovpnxor_ovpn_version }}"
+    target: install
+  when: openvpn_sources.changed or tunnelblick_sources.changed or ovpnxor_force_rebuild
+  notify: Restart openvpn service

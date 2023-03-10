@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenVPN XOR service for %I
+After=network-online.target
+
+[Service]
+Environment="OPENVPN=/etc/openvpn"
+Environment="EASYRSA=/usr/share/easy-rsa"
+Environment="EASYRSA_PKI=$OPENVPN/pki"
+Environment="EASYRSA_VARS_FILE=$OPENVPN/vars"
+ExecStart=/usr/local/bin/ovpn_run
+ExecStartPost=-/opt/tc_ip_all.sh
+DeviceAllow=/dev/null rw
+DeviceAllow=/dev/net/tun rw
+ProtectSystem=true
+ProtectHome=true
+KillMode=process
+RestartSec=5s
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
