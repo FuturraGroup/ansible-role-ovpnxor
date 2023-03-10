@@ -10,10 +10,11 @@ Install and setup:
 
 Requirements
 ------------
+
 Since  role not supported generating certificates and keys
 the users of the role are expected to use some other way of generating certificates/keys (eg using another Ansible role).
-For more information, see [https://openvpn.net/community-resources/setting-up-your-own-certificate-authority-ca/]
-And more information for openvpn_xorpatch [https://tunnelblick.net/cOpenvpn_xorpatch.html]
+For more information, see [Setting up your own Certificate Authority (CA)](https://openvpn.net/community-resources/setting-up-your-own-certificate-authority-ca/)
+And more information for [openvpn_xorpatch](https://tunnelblick.net/cOpenvpn_xorpatch.html)
 
 1. Correct /etc/apt/sources.list
 2. Correct netplan settings
@@ -51,8 +52,7 @@ ovpnxor_radius_server_timeout2: 30
 Dependencies
 ------------
 
-Generating certificates and keys:
-[https://openvpn.net/community-resources/setting-up-your-own-certificate-authority-ca/]
+[Generating certificates and keys](https://openvpn.net/community-resources/setting-up-your-own-certificate-authority-ca/)
 
 Example Playbook
 ----------------
